@@ -32,7 +32,7 @@ export function renderLoginPage() {
         const emailSaisi = document.getElementById("email").value;
         const passwordSaisi = document.getElementById("password").value;
 
-        fetch(`http://localhost:3000/users?email=${emailSaisi}&password=${passwordSaisi}`)
+    fetch(`${API_BASE_URL}/users?email=${emailSaisi}&password=${passwordSaisi}`)
             .then(response => response.json())
             .then(users => {
                 if (users.length > 0) {
