@@ -1,9 +1,24 @@
 const NAV_LINKS = [
   { page: "categories", label: "Catégories", icon: "fa-tags" },
   { page: "produits", label: "Produits", icon: "fa-box-open" }, 
+  { page: "fournisseur", label: "Fournisseurs", icon: "fa-users" },
 ];
 export function renderSidebar() {
-  const items = NAV_LINKS.map((link) => `
+  const roleActuel = localStorage.getItem("userRole");
+
+  let links = [
+    { page: "categories", label: "Catégories", icon: "fa-tags" },
+    { page: "produits", label: "Produits", icon: "fa-box-open" }, 
+    { page: "fournisseur", label: "Fournisseurs", icon: "fa-users" },
+  ];
+
+  if (roleActuel === "fournisseur") {
+    links = [    { page: "produits", label: "Produits", icon: "fa-box-open" },
+      
+    ];
+  }
+
+  const items = links.map((link) => `
     <button class="nav-link flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950" data-page="${link.page}">
       <i class="fa-solid ${link.icon} w-5 text-center"></i>
       <span>${link.label}</span>
@@ -11,32 +26,51 @@ export function renderSidebar() {
   `).join("");
 
   return `
-    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-72 -translate-x-full border-r border-slate-200 bg-white transition-transform duration-300 lg:translate-x-0">
-      <div class="flex items-center gap-3 px-5 py-5">
-        <div class="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-cyan-500 text-sm font-black tracking-wide text-white shadow-lg shadow-indigo-200">
-          <i class="fa-solid fa-layer-group"></i>
-        </div>
+    <aside id="sidebar" class="fixed inset-y-0 left-0 z-40 w-72 -translate-x-full border-r border-slate-200 bg-white p-6 transition-transform duration-300 lg:translate-x-0">
+      <div class="flex h-full flex-col justify-between">
         <div>
-          <h1 class="text-lg font-extrabold tracking-tight text-slate-950">Gestion Appro</h1>
-         
-        </div>
-      </div>
-
-      <nav class="grid gap-2 px-4 pb-4" aria-label="Navigation principale">
-        ${items}
-      </nav>
-
-      <div class="absolute bottom-5 w-full px-5">
-        <div class="rounded-3xl border border-slate-200 bg-slate-50 p-4 text-xs text-slate-500">
-          <div class="mb-2 flex items-center gap-2 font-semibold text-slate-700">
-            <span class="h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
-            API JSON Server
+          <div class="flex items-center gap-3 px-2 py-4">
+            <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white">
+              <i class="fa-solid fa-layer-group text-lg"></i>
+            </div>
+            <span class="text-lg font-black tracking-tight text-slate-950">Gestion Appro</span>
           </div>
-          <code class="rounded-lg bg-white px-2 py-1 text-[11px] text-slate-700">localhost:3000</code>
+          
+          <nav class="mt-8 flex flex-col gap-1">
+            ${items}
+          </nav>
         </div>
+
+        <button id="logoutBtn" class="flex items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-semibold text-rose-600 transition hover:bg-rose-50">
+          <i class="fa-solid fa-right-from-bracket w-5 text-center"></i>
+          <span>Déconnexion</span>
+        </button>
       </div>
     </aside>
-
-    <div id="sidebarOverlay" class="fixed inset-0 z-30 hidden bg-slate-950/40 backdrop-blur-sm lg:hidden"></div>
+    <div id="sidebarOverlay" class="fixed inset-0 z-30 bg-slate-950/20 opacity-0 transition-opacity duration-300 lg:hidden hidden"></div>
   `;
+}
+
+export function bindSidebarEvents() {
+  document.querySelectorAll(".nav-link").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const page = btn.dataset.page;
+      if (page) {
+        import("../router.js").then(router => router.navigate(page));
+      }
+    });
+  });
+
+  const logoutBtn = document.getElementById("logoutBtn");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", (event) => {
+      event.preventDefault();
+
+      localStorage.removeItem("userRole");
+      localStorage.removeItem("userEmail");
+
+     
+      window.location.reload();
+    });
+  }
 }

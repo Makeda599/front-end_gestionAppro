@@ -1,20 +1,66 @@
 import { showToast } from "./components/toast.js";
+import { renderSidebar } from "./components/sidebar.js";
+import { renderNavbar } from "./components/navbar.js";
 import { renderCategoriesPage } from "./pages/categoriesPage.js";
 import { renderProduitsPage } from "./pages/produitsPage.js"; 
+import { renderFournisseurPage } from "./pages/fournisseurPage.js";
+import { renderLoginPage } from "./pages/loginPage.js";
+
 const routes = {
   categories: renderCategoriesPage,
   produits: renderProduitsPage, 
+  fournisseur: renderFournisseurPage,
+  login: renderLoginPage
 };
 
 const titles = {
   categories: "Catégories",
   produits: "Produits", 
+  fournisseur: "Fournisseurs",
+  login: "Connexion"
 };
 
-export async function navigate(page = "categories") {
+export async function navigate(page = "login") {
   const app = document.getElementById("app");
+  if (!app) {
+    console.error("Élément #app introuvable dans le DOM !");
+    return;
+  }
   
-  const route = routes[page] || routes.categories;
+  const roleActuel = localStorage.getItem("userRole"); 
+  const estConnecte = roleActuel !== null;
+
+  if (!estConnecte && page !== "login") {
+    page = "login";
+  }
+
+  if (estConnecte && page === "login") {
+    page = "categories";
+  }
+
+  if (estConnecte && roleActuel === "fournisseur" && page === "fournisseur") {
+    showToast("Accès refusé ! Vous n'avez pas accès aux Fournisseurs.", "error");
+    page = "categories"; 
+  }
+
+  if (page === "fournisseur" && roleActuel !== "admin") {
+    showToast("Accès refusé ! Réservé aux Administrateurs.", "error");
+    page = "categories"; 
+  }
+
+  const sidebarRoot = document.getElementById("sidebarRoot");
+  const navbarRoot = document.getElementById("navbarRoot");
+
+  if (page === "login") {
+    if (sidebarRoot) sidebarRoot.innerHTML = "";
+    if (navbarRoot) navbarRoot.innerHTML = "";
+    document.getElementById("mainContent")?.classList.remove("lg:pl-72");
+  } else {
+    
+    if (sidebarRoot) sidebarRoot.innerHTML = renderSidebar();
+    if (navbarRoot && navbarRoot.innerHTML === "") navbarRoot.innerHTML = renderNavbar();
+    document.getElementById("mainContent")?.classList.add("lg:pl-72");
+  }
 
   document.querySelectorAll("[data-page]").forEach((button) => {
     const isActive = button.dataset.page === page;
@@ -41,20 +87,16 @@ export async function navigate(page = "categories") {
     </div>
   `;
 
+  const route = routes[page] || routes.categories;
   try {
-    await route();
+    setTimeout(async () => {
+      await route();
+    }, 50);
   } catch (error) {
     app.innerHTML = `
       <section class="rounded-[2rem] border border-rose-200 bg-white p-8 shadow-sm">
-        <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-rose-600">
-          <i class="fa-solid fa-triangle-exclamation"></i>
-        </div>
-        <h1 class="text-2xl font-black tracking-tight text-slate-950">Erreur de chargement</h1>
-        <p class="mt-2 text-sm leading-6 text-slate-600">${error.message}</p>
-        <p class="mt-4 rounded-2xl bg-slate-50 p-4 text-sm text-slate-600">
-          Vérifie que JSON Server est bien lancé avec :
-          <strong class="font-black text-slate-950">npx json-server db.json --port 3000</strong>
-        </p>
+        <h1 class="text-2xl font-black text-slate-950">Erreur de chargement</h1>
+        <p class="mt-2 text-sm text-slate-600">${error.message}</p>
       </section>
     `;
     showToast(error.message, "error");

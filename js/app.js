@@ -1,33 +1,24 @@
-import { renderSidebar } from "./components/sidebar.js";
-import { renderNavbar } from "./components/navbar.js";
 import { navigate } from "./router.js";
 
-function mountLayout() {
-  document.getElementById("sidebarRoot").innerHTML = renderSidebar();
-  document.getElementById("navbarRoot").innerHTML = renderNavbar();
-  
-  if (!document.getElementById("sidebarOverlay")) {
-    const overlay = document.createElement("div");
-    overlay.id = "sidebarOverlay";
-    overlay.className = "fixed inset-0 z-30 hidden bg-slate-950/40 backdrop-blur-sm lg:hidden";
-    document.body.appendChild(overlay);
-  }
-}
-
-function initSidebar() {
+function initSidebarEvents() {
   const sidebar = document.getElementById("sidebar");
   const overlay = document.getElementById("sidebarOverlay");
   const toggle = document.getElementById("sidebarToggle");
 
   const close = () => {
-    if (sidebar) sidebar.classList.add("-translate-x-full");
-    if (overlay) overlay.classList.add("hidden");
+    const sb = document.getElementById("sidebar");
+    const ol = document.getElementById("sidebarOverlay");
+    if (sb) sb.classList.add("-translate-x-full");
+    if (ol) ol.classList.add("hidden");
   };
 
   if (toggle) {
-    toggle.addEventListener("click", () => {
-      if (sidebar) sidebar.classList.remove("-translate-x-full");
-      if (overlay) overlay.classList.remove("hidden");
+    toggle.replaceWith(toggle.cloneNode(true)); 
+    document.getElementById("sidebarToggle").addEventListener("click", () => {
+      const sb = document.getElementById("sidebar");
+      const ol = document.getElementById("sidebarOverlay");
+      if (sb) sb.classList.remove("-translate-x-full");
+      if (ol) ol.classList.remove("hidden");
     });
   }
 
@@ -38,18 +29,30 @@ function initSidebar() {
   return { close };
 }
 
-
-function initNavigation(sidebar) {
+function initNavigation() {
   document.addEventListener("click", async (event) => {
-    const button = event.target.closest("[data-page]");
     
+    const logoutBtn = event.target.closest("#logoutBtn");
+    if (logoutBtn) {
+      event.preventDefault();
+      
+      localStorage.removeItem("userRole");
+      localStorage.removeItem("userEmail");
+      
+      navigate("login"); 
+      return;
+    }
+
+    const button = event.target.closest("[data-page]");
     if (button) {
       event.preventDefault();
       const targetPage = button.dataset.page;
       
       try {
         await navigate(targetPage);
-        if (window.innerWidth < 1024) sidebar.close();
+        if (window.innerWidth < 1024) {
+          initSidebarEvents().close();
+        }
       } catch (error) {
         console.error("Erreur lors de la navigation :", error);
       }
@@ -58,11 +61,19 @@ function initNavigation(sidebar) {
 }
 
 function startApp() {
-  mountLayout();
-  const sidebar = initSidebar();
-  initNavigation(sidebar);
+  initNavigation();
   
-  navigate("produits"); 
+  const roleActuel = localStorage.getItem("userRole");
+
+  if (roleActuel) {
+    if (roleActuel === "fournisseur") {
+      navigate("produits"); 
+    } else {
+      navigate("categories"); 
+    }
+  } else {
+    navigate("login"); 
+  }
 }
 
 startApp();

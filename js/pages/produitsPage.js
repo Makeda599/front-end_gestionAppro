@@ -1,29 +1,30 @@
 import { pageHeader } from "../components/pageHeader.js";
 import { renderProduitRow, renderProduitCard } from "../components/produitTemplate.js";
-import { getProduits, deleteProduit, createProduit } from "../services/produitService.js";
+import { getProduits, deleteProduit, createProduit, updateProduit } from "../services/produitService.js";
 import { uploadProductImage } from "../services/cloudinaryService.js";
-import { openModal } from "../components/modal.js";
+import { openModal, openConfirm } from "../components/modal.js";
 import { showToast } from "../components/toast.js";
 import { getCategories } from "../services/categorieService.js";
 import { validateProduitForm } from "../utils/validators.js"; 
 import { escapeHtml } from "../utils/html.js";
-import { navigate } from "../router.js";
 
 let currentView = "card"; 
-
 
 export async function renderProduitsPage() {
   const container = document.getElementById("app");
   if (!container) return;
   
+  const roleActuel = localStorage.getItem("userRole");
+  const estFournisseur = roleActuel === "fournisseur";
+
   container.innerHTML = `
     ${pageHeader({
       kicker: "Stock",
       title: "Produits",
-      subtitle: "Gérez votre catalogue d'articles et leurs images en temps réel.",
-      actionLabel: "Nouveau Produit",
-      actionId: "addProduitBtn",
-      actionIcon: "fa-plus"
+      subtitle: "Gerez votre catalogue d'articles et leurs images en temps reel.",
+      actionLabel: estFournisseur ? null : "Nouveau Produit",
+      actionId: estFournisseur ? null : "addProduitBtn",
+      actionIcon: estFournisseur ? null : "fa-plus"
     })}
 
     <div class="mb-6 flex justify-end gap-2 bg-slate-200/60 p-1 rounded-2xl w-fit ml-auto">
@@ -45,9 +46,8 @@ export async function renderProduitsPage() {
   document.getElementById("viewCardBtn")?.addEventListener("click", () => switchView("card"));
   document.getElementById("viewListBtn")?.addEventListener("click", () => switchView("list"));
   
-  document.getElementById("addProduitBtn")?.addEventListener("click", () => {
-    openProduitForm();
-  });
+  // L'écouteur s'attache uniquement si le bouton existe (donc pas pour le fournisseur)
+  document.getElementById("addProduitBtn")?.addEventListener("click", () => openProduitForm());
 
   await loadProduits();
 }
@@ -60,6 +60,9 @@ async function switchView(view) {
 async function loadProduits() {
   const target = document.getElementById("produitsContainer");
   if (!target) return;
+
+  const roleActuel = localStorage.getItem("userRole");
+  const estFournisseur = roleActuel === "fournisseur";
 
   try {
     const produits = await getProduits();
@@ -79,7 +82,7 @@ async function loadProduits() {
                 <th class="p-4">Libellé</th>
                 <th class="p-4">Catégorie</th>
                 <th class="p-4">Prix</th>
-                <th class="p-4 text-right w-24">Actions</th>
+                ${!estFournisseur ? `<th class="p-4 text-right w-24">Actions</th>` : ""}
               </tr>
             </thead>
             <tbody id="produitsListBody">
@@ -96,36 +99,64 @@ async function loadProduits() {
       `;
     }
 
-    target.querySelectorAll("[data-delete-id]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        if (confirm("Supprimer ce produit ?")) {
-          await deleteProduit(btn.dataset.deleteId);
-          await loadProduits();
-        }
-      });
-    });
+    if (!estFournisseur) {
+      bindProduitActions(produits);
+    }
 
   } catch (error) {
     target.innerHTML = `<p class="text-center py-12 text-rose-600">Erreur : ${error.message}</p>`;
   }
 }
 
-function produitFormBody(categories) {
+function bindProduitActions(produits) {
+  document.querySelectorAll("[data-edit-id]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const prod = produits.find(p => String(p.id) === String(btn.dataset.editId));
+      if (prod) openProduitForm(prod);
+    });
+  });
+
+  document.querySelectorAll("[data-delete-id]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.deleteId;
+      openConfirm({
+        message: "Voulez-vous vraiment supprimer ce produit ? Cette action est irreversible.",
+        confirmLabel: "Supprimer",
+        onConfirm: async () => {
+          try {
+            await deleteProduit(id);
+            showToast("Produit supprime avec succes !");
+            await loadProduits();
+            return true;
+          } catch (error) {
+            showToast(error.message || "Erreur lors de la suppression", "error");
+            return false;
+          }
+        }
+      });
+    });
+  });
+}
+
+function produitFormBody(categories, produit = null) {
+  const isEdit = produit !== null;
   const options = categories.map(cat => `
-    <option value="${cat.id}">${escapeHtml(cat.libelle)}</option>
+    <option value="${cat.id}" ${produit?.categorieId === cat.id ? "selected" : ""}>${escapeHtml(cat.libelle)}</option>
   `).join("");
 
   return `
     <div class="space-y-4">
       <div>
         <label class="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500" for="produitLibelle">Libellé *</label>
-        <input class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100" type="text" id="produitLibelle" placeholder="ex: Jus de Mangue" autocomplete="off" />
+        <input class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100" 
+          type="text" id="produitLibelle" value="${escapeHtml(produit?.libelle || "")}" placeholder="ex: Jus de Mangue" autocomplete="off" />
       </div>
 
       <div class="grid grid-cols-2 gap-4">
         <div>
           <label class="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500" for="produitPrix">Prix (FCFA) *</label>
-          <input class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100" type="number" id="produitPrix" placeholder="ex: 1500" min="0" />
+          <input class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100" 
+            type="number" id="produitPrix" value="${produit?.prix || ""}" placeholder="ex: 1500" min="0" />
         </div>
         <div>
           <label class="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500" for="produitCategorie">Catégorie *</label>
@@ -137,7 +168,9 @@ function produitFormBody(categories) {
       </div>
 
       <div>
-        <label class="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500" for="produitImage">Image du produit</label>
+        <label class="mb-2 block text-xs font-extrabold uppercase tracking-[0.14em] text-slate-500" for="produitImage">
+          ${isEdit ? "Remplacer l'image du produit (Optionnel)" : "Image du produit"}
+        </label>
         <input class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-medium text-slate-800 outline-none transition focus:border-indigo-500" type="file" id="produitImage" accept="image/*" />
       </div>
 
@@ -146,15 +179,16 @@ function produitFormBody(categories) {
   `;
 }
 
-async function openProduitForm() {
+async function openProduitForm(produit = null) {
+  const isEdit = produit !== null;
   try {
     const categories = await getCategories();
 
     openModal({
-      title: "Nouveau produit",
+      title: isEdit ? "Modifier le produit" : "Nouveau produit",
       icon: "fa-box",
-      body: produitFormBody(categories),
-      confirmLabel: "Créer le produit",
+      body: produitFormBody(categories, produit),
+      confirmLabel: isEdit ? "Enregistrer" : "Créer le produit",
       onConfirm: async (modal) => {
         const errorText = modal.querySelector("#produitFormError");
         const libelle = modal.querySelector("#produitLibelle").value;
@@ -173,29 +207,35 @@ async function openProduitForm() {
         errorText.classList.add("hidden");
 
         try {
-          let imageUrlFinal = "https://placehold.co/600x400?text=Pas+d+image";
-          let imagePublicIdFinal = null;
+          let imageUrlFinal = isEdit ? produit.imageUrl : "https://placehold.co/600x400?text=Pas+d+image";
+          let imagePublicIdFinal = isEdit ? produit.imagePublicId : null;
           
           if (imageInput && imageInput.files.length > 0) {
-            errorText.textContent = "Téléchargement de l'image...";
+            errorText.textContent = "Telechargement de l'image...";
             errorText.classList.remove("hidden");
             
             const file = imageInput.files[0];
-            
             const uploadResult = await uploadProductImage(file); 
             imageUrlFinal = uploadResult.imageUrl;
             imagePublicIdFinal = uploadResult.imagePublicId;
           }
 
-          await createProduit({
-            libelle,
-            prix,
+          const produitData = {
+            libelle: libelle.trim(),
+            prix: Number(prix),
             categorieId,
             imageUrl: imageUrlFinal,
             imagePublicId: imagePublicIdFinal 
-          });
+          };
 
-          showToast("Produit créé avec succès !");
+          if (isEdit) {
+            await updateProduit(produit.id, produitData);
+            showToast("Produit modifie avec succes !");
+          } else {
+            await createProduit(produitData);
+            showToast("Produit cree avec succes !");
+          }
+
           await loadProduits();
           return true; 
         } catch (serverError) {
@@ -206,6 +246,6 @@ async function openProduitForm() {
       }
     });
   } catch (err) {
-    showToast("Impossible de charger les catégories : " + err.message, "error");
+    showToast("Impossible de charger les categories : " + err.message, "error");
   }
 }

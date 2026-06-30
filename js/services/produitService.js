@@ -23,6 +23,8 @@ export async function getProduits() {
       console.warn("Impossible de lier les catégories, affichage des produits bruts :", catError);
     }
 
+    return produits; 
+
   } catch (error) {
     console.error("Erreur dans getProduits service:", error);
     return []; 
@@ -50,6 +52,26 @@ export async function createProduit(data) {
       body: JSON.stringify(nouveauProduit),
     },
     "Impossible de créer le produit."
+  );
+}
+
+export async function updateProduit(id, data) {
+  const produitModifie = {
+    id: id, // On conserve le même identifiant
+    libelle: data.libelle.trim(),
+    prix: parseFloat(data.prix),
+    categorieId: data.categorieId,
+    imageUrl: data.imageUrl,
+    imagePublicId: data.imagePublicId
+  };
+
+  return apiRequest(
+    `${ENDPOINTS.produits}/${id}`,
+    {
+      method: "PUT", 
+      body: JSON.stringify(produitModifie),
+    },
+    "Impossible de modifier le produit."
   );
 }
 
