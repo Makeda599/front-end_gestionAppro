@@ -1,6 +1,6 @@
 import { showToast } from "../components/toast.js";
 import { navigate } from "../router.js"; 
-
+import { API_BASE_URL } from "../config.js";
 export function renderLoginPage() {
     const mainPage = document.getElementById("app");
     
